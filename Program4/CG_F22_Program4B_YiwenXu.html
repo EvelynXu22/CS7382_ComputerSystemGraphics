@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Program 4B</title>
+</head>
+
+<body>
+
+    <canvas id="gl-canvas" width="512" height="360">Oops ... your browser doesn't support the HTML5 canvas element
+    </canvas>
+    
+    <div>
+        Input file here: <input type="file" id="fileInput"><br>
+    </div>
+
+    <br>
+    <div>
+    <tr>
+        <th>Key color</th>
+        <td>
+            <input type="color" id="keyColor" value="#00ff00">
+        </td>
+    </tr><br>
+    <tr>
+        <th>Similarity</th>
+        <td>
+            <input type="range" id="similarity" min="0" max="1" step="0.01" value="0.24">
+            <span id="showSimilarity">0.24</span>
+        </td>
+    </tr><br>
+    <tr>
+        <th>Smoothness</th>
+        <td>
+            <input type="range" id="smoothness" min="0" max="1" step="0.01" value="0.29">
+            <span id="showSmoothness">0.29</span>
+        </td>
+    </tr><br>
+    <tr>
+        <th>Spill</th>
+        <td>
+            <input type="range" id="spill" min="0" max="1" step="0.01" value="0.37">
+            <span id="showSpill">0.37</span>
+        </td>
+    </tr><br>
+</div>
+
+    <script id="vertex-shader1" type="x-shader/x-vertex">
+        #version 300 es
+        
+        in vec4 aPosition;
+        
+        void main()
+        {
+            gl_Position = aPosition;
+
+        }
+    </script>
+
+    <script id="vertex-shader2" type="x-shader/x-vertex">
+        #version 300 es
+        
+        in vec4 aPosition;
+        in vec2 aTexCoord;
+        
+        out vec2 vTexCoord;
+        
+        void main()
+        {
+        
+        gl_Position = aPosition;
+        vTexCoord = aTexCoord;
+        
+        }
+    </script>
+
+    <script id="fragment-shader1" type="x-shader/x-fragment">
+        #version 300 es
+        
+        precision mediump float;
+
+        out vec4 fColor;
+
+        void main()
+        {
+                fColor = vec4(1.0, 0.0, 0.0, 1.0);
+        }
+    </script>
+
+    <script id="fragment-shader2" type="x-shader/x-fragment">
+        #version 300 es
+        
+        precision mediump float;
+        
+        uniform sampler2D uBeforeUnite, uAfterUnite;
+        uniform float similarity;
+        uniform float smoothness;
+        uniform float spill;
+        uniform vec3 keyColor;
+
+        in vec2 vTexCoord;
+
+        out vec4 fColor;
+
+        // From https://github.com/libretro/glsl-shaders/blob/master/nnedi3/shaders/rgb-to-yuv.glsl
+        vec2 RGBtoUV(vec3 rgb) {
+            return vec2(
+              rgb.r * -0.169 + rgb.g * -0.331 + rgb.b *  0.5    + 0.5,
+              rgb.r *  0.5   + rgb.g * -0.419 + rgb.b * -0.081  + 0.5
+            );
+        }
+
+        vec4 ProcessChromaKey() {
+            vec4 argb = texture(uBeforeUnite, vTexCoord);
+            vec4 brgb = texture(uAfterUnite, vTexCoord);
+
+            float chromaDist = distance(RGBtoUV(texture(uAfterUnite, vTexCoord).rgb), RGBtoUV(keyColor));
+
+            float baseMask = chromaDist - similarity;
+            
+            float spillVal = pow(clamp(baseMask / spill, 0., 1.), 1.5);
+            float fullMask = pow(clamp(baseMask / smoothness, 0., 1.), 1.5);
+
+            float desat = clamp(brgb.r * 0.2126 + brgb.g * 0.7152 + brgb.b * 0.0722, 0., 1.);
+            brgb.rgb = mix(vec3(desat, desat, desat), brgb.rgb, spillVal);
+            
+            argb.rgb = mix(argb.rgb, brgb.rgb , fullMask);
+
+            return argb;
+        }
+        
+        void main(){
+            fColor = ProcessChromaKey();
+        }
+    </script>
+
+    <script type="text/javascript" src="../Common/InitShaders.js"></script>
+    <script type="text/javascript" src="../Common/MVnew.js"></script>
+    <script type="text/javascript" src="CG_F22_Program4B_YiwenXu.js"></script>
+
+</body>
+
+</html>

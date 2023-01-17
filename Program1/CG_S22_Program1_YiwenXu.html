@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+<title>Program1</title>
+</head>
+
+<body>
+    <div>
+        speed 0% <input id="slider" type="range" min="0" max="50" step="5" value="25" />
+        100%
+    </div>
+    <div>
+        X Position <input id="X-slider" type="range" min="-0.41" max="0.41" step="0.005" value="0.0" />
+    </div>
+
+    <div>
+        Y Position <input id="Y-slider" type="range" min="-0.68" max="0.21" step="0.005" value="0.0" />
+    </div>
+
+    <div>
+        <canvas id="gl-canvas" width="512" height="512"> </canvas>
+    </div>
+
+    <!-- <button id="Direction">Change Rotation Direction</button> -->
+    <button id="xButton">Rotate X</button>
+    <button id="yButton">Rotate Y</button>
+    <button id="zButton">Rotate Z</button>
+    <button id="ButtonT"> Toggle Rotation</button>
+    <button id="ButtonP"> Pedestal Toggle</button>
+    <button id="ButtonC"> Confetti</button>
+    <button id="ButtonI"> Only Rotate Initials</button>
+
+    <select id="Controls" size="3">
+        <option value="0">Toggle Rotation</option>
+        <option value="1">Spin Faster</option>
+        <option value="2">Spin Slower</option>
+    </select>
+
+</body>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+#version 300 es
+
+in vec4 aPosition;
+in vec4 aColor;
+in vec3 aStartAngle;
+in vec2 aOffset;
+
+out vec4 vColor;
+
+uniform vec3 uTheta;
+uniform float uX;
+uniform float uY;
+uniform float uTime;
+
+
+void main()
+{
+    // Compute the sines and cosines of theta for each of
+    //   the three axes in one computation.
+
+    // Give confetti different start angles and rotation angle
+    vec3 angles =  uTheta  + aStartAngle + aStartAngle * uTime * 0.4; // convert degrees to radians
+    vec3 c = cos( angles );
+    vec3 s = sin( angles );
+
+    // For every confetti different offset
+    float tx = uX + aOffset.x;
+    float ty = uY + aOffset.y - 0.5 * uTime;
+
+    // Remeber: thse matrices are column-major
+    mat4 rx = mat4( 1.0,  0.0,  0.0, 0.0,
+		    0.0,  c.x,  s.x, 0.0,
+		    0.0, -s.x,  c.x, 0.0,
+		    0.0,  0.0,  0.0, 1.0 );
+
+    mat4 ry = mat4( c.y, 0.0, -s.y, 0.0,
+		    0.0, 1.0,  0.0, 0.0,
+		    s.y, 0.0,  c.y, 0.0,
+		    0.0, 0.0,  0.0, 1.0 );
+
+
+    mat4 rz = mat4( c.z, s.z, 0.0, 0.0,
+		    -s.z,  c.z, 0.0, 0.0,
+		    0.0,  0.0, 1.0, 0.0,
+		    0.0,  0.0, 0.0, 1.0 );
+
+    mat4 txyz = mat4(
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        tx, ty, 0.0, 1.0
+    );
+
+    vColor = aColor;
+    gl_Position =  txyz * rz * ry * rx * aPosition;
+}
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+#version 300 es
+precision mediump float;
+
+in vec4 vColor;
+out vec4 fColor;
+
+void
+main()
+{
+    fColor = vColor;
+}
+</script>
+
+
+<script src="../Common/initShaders.js"></script>
+<script src="../Common/MVnew.js"></script>
+<script src="CG_S22_Program1_YiwenXu_Points.js"></script>
+<script src="CG_S22_Program1_YiwenXu.js"></script>
+
+</html>

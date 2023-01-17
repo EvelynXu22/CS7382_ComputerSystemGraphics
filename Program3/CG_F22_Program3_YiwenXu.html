@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Program3</title>
+</head>
+
+<body>
+    <canvas id="gl-canvas" width="628" height="628"></canvas>
+
+
+    <div>
+        body angle -180 <input id="slider1" type="range" min="-180" max="180" step="10" value="0" />
+        180
+    </div>
+
+    <div>
+        upper arm angle -130 <input id="slider2" type="range" min="-130" max="130" step="10" value="0" />
+        130
+    </div>
+
+    <div>
+        head angle -130 <input id="slider3" type="range" min="-130" max="130" step="10" value="0" />
+        130
+    </div>
+
+
+    <div>
+        Translate X<input id="translateX" type="range" min="-10" max="10" step="0.1" value="0" />
+    </div>
+    <div>
+        Translate Z<input id="translateZ" type="range" min="-10" max="10" step="0.1" value="0" />
+    </div>
+
+
+    <div>
+        Scale XZ<input id="scaleXZ" type="range" min="0.5" max="2" step="0.1" value="1" />
+    </div>
+    <div>
+        Scale Y<input id="scaleY" type="range" min="0.5" max="2" step="0.1" value="1" />
+    </div>
+
+    Ambient Light Color
+    <div>
+        R <input id="ambientR" type="range" min="0.0" max="1" step="0.01" value="0.2" />
+        G <input id="ambientG" type="range" min="0.0" max="1" step="0.01" value="0.2" />
+        B <input id="ambientB" type="range" min="0.0" max="1" step="0.01" value="0.2" />
+    </div>
+
+    <div>
+        <button id="IncreasePhi">Increase phi</button>
+        <button id="DecreasePhi">Decrease phi</button>
+        <button id="UpLight">Up Light Pos</button>
+        <button id="DownLight">Down Light Pos</button>
+    </div>
+
+    <div>
+        <button id="shading">Gouraud Shading</button>
+    </div>
+    
+
+    <!-- Incorporate lighting in the vertex shader -->
+    <script id="vertex-shader" type="x-shader/x-vertex">
+        #version 300 es
+        
+        in vec4 aPosition;
+        in vec4 aColor;
+        out vec4 vColor;
+
+        in vec4 aNormal;
+        
+        uniform mat4 modelViewMatrix;
+        uniform mat4 projectionMatrix;
+
+        uniform vec4 uAmbientProduct;
+        uniform vec4 uDiffuseProduct;
+        uniform vec4 uSpecularProduct;
+        uniform vec4 uLightPosition;
+        uniform float uShininess;
+
+        uniform mat3 uNormalMatrix;
+        
+        void main()
+        {
+            vec3 light = normalize(uLightPosition).xyz;
+            vec3 pos = (modelViewMatrix * aPosition).xyz;
+            vec3 L = light;
+            if(uLightPosition.z != 0.0)  
+                L = light - pos;
+            vec3 E =  -normalize(pos);
+            vec3 N = normalize(uNormalMatrix*aNormal.xyz);
+            vec3 H = normalize( L + E );
+
+            vec4 ambient = uAmbientProduct;
+        
+            float Kd = max( dot(L, N), 0.0 );
+            vec4  diffuse = Kd*uDiffuseProduct;
+        
+            float Ks = pow( max(dot(N, H), 0.0), uShininess );
+            vec4  specular = Ks * uSpecularProduct;
+        
+            if( dot(L, N) < 0.0 ) specular = vec4(0.0, 0.0, 0.0, 1.0);
+        
+            vColor = ambient + (diffuse) * aColor +specular;
+            gl_Position = projectionMatrix * modelViewMatrix * aPosition;
+        }
+        </script>
+
+    <script id="fragment-shader" type="x-shader/x-fragment">
+        #version 300 es
+        
+        precision mediump float;
+        
+        in vec4 vColor;
+        out vec4 fColor;
+        
+        void main()
+        {
+            fColor = vColor;
+        }
+        </script>
+
+    <!-- Incorporate texture in the fragment shader -->
+    <script id="vertex-shader2" type="x-shader/x-vertex">
+        #version 300 es
+        
+        /* bump map vertex shader */
+        
+        in vec4 aPosition;
+        in vec2 aTexCoord;
+        
+        uniform mat4 modelViewMatrix;
+        uniform mat4 projectionMatrix;
+
+        uniform vec4 uLightPosition;
+        uniform mat3 uNormalMatrix;
+
+        uniform vec4 uNormal;
+
+        out vec2 vTexCoord;
+        out vec3 L; /* light vector in texture-space coordinates */
+        out vec3 V; /* view vector in texture-space coordinates */
+        
+        void main()
+        {
+            vec4 pos = vec4(aPosition.x,-aPosition.y, aPosition.z, aPosition.w);
+            gl_Position = projectionMatrix * modelViewMatrix * pos;
+            vTexCoord = aTexCoord;
+
+            vec3 eyePosition = (modelViewMatrix*aPosition).xyz;
+            vec3 eyeLightPos = (modelViewMatrix*uLightPosition).xyz;
+        
+           /* normal, tangent and binormal in eye coordinates */
+        
+            vec3 N = normalize(uNormalMatrix*uNormal.xyz);
+
+            /* tangent vector in object coordinates */
+            vec3 tangent;
+
+            vec3 c1 = cross(N, vec3(0.0, 0.0, 1.0));
+            vec3 c2 = cross(N, vec3(0.0, 1.0, 0.0));
+
+            if (length(c1)>length(c2))
+            {
+                tangent = c1;
+            }
+            else
+            {
+                tangent = c2;
+            }
+
+            vec3 T  = normalize(uNormalMatrix*tangent);
+            vec3 B = cross(N, T);
+        
+            /* light vector in texture space */
+        
+            L.x = dot(T, eyeLightPos-eyePosition);
+            L.y = dot(B, eyeLightPos-eyePosition);
+            L.z = dot(N, eyeLightPos-eyePosition);
+        
+            L = normalize(L);
+        
+            /* view vector in texture space */
+        
+            V.x = dot(T, -eyePosition);
+            V.y = dot(B, -eyePosition);
+            V.z = dot(N, -eyePosition);
+        
+            V = normalize(V);
+
+        }
+        </script>
+        
+    <script id="fragment-shader2" type="x-shader/x-fragment">
+    #version 300 es
+    
+    precision mediump float;
+    
+    in vec3 L;
+    in vec3 V; 
+    in vec2 vTexCoord;
+
+    out vec4 fColor;
+
+    uniform vec4 uAmbientProduct;
+    uniform vec4 uSpecularProduct;
+    uniform float uShininess;
+    
+    uniform sampler2D uTexMap;
+    uniform sampler2D uNormMap;
+    
+    void main()
+    {
+        vec4 uDiffuseProduct = texture(uTexMap, vTexCoord);
+        vec3 N = texture(uNormMap, vTexCoord).rgb;
+
+        vec3 NN =  normalize(2.0*N.xyz-1.0);
+        vec3 LL = normalize(L);
+
+        float Kd = max(dot(NN, LL), 0.0);
+
+
+        float Ks = pow( max(dot(NN, V), 0.0), uShininess );
+        vec4  specular = Ks * uSpecularProduct;
+        if( dot(LL, NN) < 0.0 ) specular = vec4(0.0, 0.0, 0.0, 1.0);
+
+        fColor = Kd*uDiffuseProduct + uAmbientProduct + specular;
+    
+    }
+    </script>
+
+    <!-- Incorporate lighting in the fragment shader -->
+    <script id="vertex-shader3" type="x-shader/x-vertex">
+        #version 300 es
+        
+        in vec4 aPosition;
+        in vec4 aColor;
+        out vec4 vColor;
+
+        in vec4 aNormal;
+        out vec3 N, L, E;
+        
+        uniform mat4 modelViewMatrix;
+        uniform mat4 projectionMatrix;
+
+        uniform vec4 uLightPosition;
+        uniform mat3 uNormalMatrix;
+        
+        void main()
+        {
+            vec3 light;
+            vec3 pos = (modelViewMatrix * aPosition).xyz;
+            if(uLightPosition.z == 0.0)  
+                  L = normalize(uLightPosition.xyz);
+            else  
+                  L = normalize(uLightPosition).xyz - pos;
+        
+            E =  -normalize(pos);
+            N = normalize(uNormalMatrix*aNormal.xyz);
+
+            vColor = aColor;
+
+            gl_Position = projectionMatrix * modelViewMatrix * aPosition;
+        }
+    </script>
+
+    <script id="fragment-shader3" type="x-shader/x-fragment">
+        #version 300 es
+        
+        precision mediump float;
+
+        uniform vec4 uAmbientProduct;
+        uniform vec4 uDiffuseProduct;
+        uniform vec4 uSpecularProduct;
+        uniform float uShininess;
+
+        in vec3 N, L, E;
+        
+        in vec4 vColor;
+        out vec4 fColor;
+        
+        void main()
+        {
+            vec3 H = normalize( L + E );
+            vec4 ambient = uAmbientProduct;
+        
+            float Kd = max( dot(L, N), 0.0 );
+            vec4  diffuse = Kd * uDiffuseProduct;
+        
+            float Ks = pow( max(dot(N, H), 0.0), uShininess );
+            vec4  specular = Ks * uSpecularProduct;
+        
+            if( dot(L, N) < 0.0 ) specular = vec4(0.0, 0.0, 0.0, 1.0);
+            fColor = ambient + (diffuse) * vColor +specular;
+        }
+    </script>
+
+    <script src="../Common/initShaders.js"></script>
+    <script src="../Common/MVnew.js"></script>
+    <script src="CG_F22_Program3_YiwenXu_honolulu256.js"></script>
+    <script src="CG_F22_Program3_YiwenXu.js"></script>
+</body>
+
+</html>
